@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Iterable
@@ -43,3 +44,50 @@ def unique_by_url(items: Iterable[dict]) -> list[dict]:
         seen.add(url)
         unique.append(item)
     return unique
+
+
+def tokenize_for_relevance(text: str) -> set[str]:
+    text = clean_text(text).lower()
+    tokens = {item for item in re.findall(r"[a-z0-9][a-z0-9_\-]{1,}", text)}
+    for chunk in re.findall(r"[\u4e00-\u9fff]{2,}", text):
+        tokens.add(chunk)
+        tokens.update(chunk[index : index + 2] for index in range(max(0, len(chunk) - 1)))
+    return tokens
+
+
+def relevance_overlap(left: str, right: str) -> int:
+    return len(tokenize_for_relevance(left) & tokenize_for_relevance(right))
+
+
+def parse_json_object(text: str) -> dict:
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```$", "", raw)
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+        if not match:
+            raise
+        parsed = json.loads(match.group(0))
+    if not isinstance(parsed, dict):
+        raise ValueError("JSON 不是对象。")
+    return parsed
+
+
+def parse_json_array(text: str) -> list:
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```$", "", raw)
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        match = re.search(r"\[.*\]", raw, flags=re.DOTALL)
+        if not match:
+            raise
+        parsed = json.loads(match.group(0))
+    if not isinstance(parsed, list):
+        raise ValueError("JSON 不是数组。")
+    return parsed

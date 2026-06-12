@@ -3,4 +3,5 @@
 __pycache__/
 .pytest_cache/
 outputs/report.md
+outputs/*.md
 evals/reports/*.json

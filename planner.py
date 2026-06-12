@@ -16,6 +16,11 @@ class Planner:
         prompt = PLANNER_PROMPT.format(query=query, max_sub_questions=self.settings.max_sub_questions)
         try:
             response = self.llm.chat(prompt, system_prompt=PLANNER_SYSTEM_PROMPT, temperature=0.2)
+        except Exception as exc:
+            print(f"Warning: 子问题规划模型调用失败，使用原问题作为 fallback。原因：{exc}")
+            return [query]
+
+        try:
             parsed = json.loads(response)
             questions = [str(item).strip() for item in parsed if str(item).strip()]
             return questions[: self.settings.max_sub_questions] or [query]

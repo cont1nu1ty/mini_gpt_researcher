@@ -1,6 +1,8 @@
+zai-sdk
 openai
 python-dotenv
 requests
 beautifulsoup4
+ddgs
 duckduckgo-search
 pytest
