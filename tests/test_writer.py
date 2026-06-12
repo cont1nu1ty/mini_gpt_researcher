@@ -126,6 +126,7 @@ def test_writer_uses_compact_model_prompt_without_reducing_generation_budget():
     assert "https://example.com/10" not in llm.prompt
     assert len(llm.prompt) < 12000
     assert "URL: https://example.com/0" in llm.prompt
+    assert "正文短引用: ([Example, n.d.](https://example.com/0))" in llm.prompt
     assert '"url":' not in llm.prompt
 
 
@@ -166,6 +167,86 @@ def test_writer_preserves_gpt_researcher_style_report_without_numbered_sections(
     assert "## 1. 摘要" not in markdown
     assert "本报告围绕" not in markdown
     assert "https://example.com/fabric" in markdown
+    assert "([Example, n.d.](https://example.com/fabric))" in markdown
+    assert "([来源](https://example.com/fabric))" not in markdown
+
+
+def test_writer_shortens_long_inline_citation_titles():
+    long_title = "北京夏季家庭出游打包穿搭攻略｜常识科普 + 认知梳理 + 出行贴士_衣物_行李_老人"
+    report = "\n".join(
+        [
+            "# 报告",
+            "",
+            "## 气候要求",
+            f"北京夏季强紫外线要求短袖兼顾透气和防晒。([{long_title}](https://www.sohu.com/a/1025218125_122647708))",
+            "",
+            "## 材质建议",
+            "应优先选择透气、轻薄、耐洗的材质。",
+            "",
+            "## 结论",
+            "短袖选择应围绕北京夏季气候做综合判断。",
+            "",
+            "## 参考来源",
+            f"- {long_title}：https://www.sohu.com/a/1025218125_122647708",
+        ]
+    )
+    report += "\n" + ("补充分析。" * 260)
+    writer = Writer(FakeLLM(report))
+
+    markdown = writer.write(
+        "北京夏季男性短袖购买",
+        ["北京夏季有什么要求？"],
+        [
+            {
+                "title": long_title,
+                "url": "https://www.sohu.com/a/1025218125_122647708",
+                "summary": "2026年北京夏季出行建议。",
+                "key_points": ["北京夏季强紫外线"],
+            }
+        ],
+    )
+
+    assert f"[{long_title}](https://www.sohu.com/a/1025218125_122647708)" not in markdown
+    assert "([Sohu, 2026](https://www.sohu.com/a/1025218125_122647708))" in markdown
+
+
+def test_writer_shortens_short_chinese_inline_citation_titles():
+    title = "冰丝短袖怎么选"
+    report = "\n".join(
+        [
+            "# 报告",
+            "",
+            "## 材质判断",
+            f"冰丝有凉感，但运动场景仍要看速干和透气。([{title}](https://clothing.taobao.com/topic/fuzhuangpinpai_568/654e2d77461b3ef7f3a649dc76d6e076.html))",
+            "",
+            "## 工艺建议",
+            "领口和缝线会影响耐洗表现。",
+            "",
+            "## 结论",
+            "短袖选择应结合场景、材质和工艺。",
+            "",
+            "## 参考来源",
+            f"- {title}：https://clothing.taobao.com/topic/fuzhuangpinpai_568/654e2d77461b3ef7f3a649dc76d6e076.html",
+        ]
+    )
+    report += "\n" + ("补充分析。" * 260)
+    writer = Writer(FakeLLM(report))
+
+    markdown = writer.write(
+        "北京夏季男性短袖购买",
+        ["冰丝短袖怎么选？"],
+        [
+            {
+                "title": title,
+                "url": "https://clothing.taobao.com/topic/fuzhuangpinpai_568/654e2d77461b3ef7f3a649dc76d6e076.html",
+                "summary": "冰丝短袖有凉感。",
+                "key_points": ["速干和透气是关键"],
+            }
+        ],
+    )
+
+    assert f"[{title}](https://clothing.taobao.com/topic/fuzhuangpinpai_568/654e2d77461b3ef7f3a649dc76d6e076.html)" not in markdown
+    assert "([Taobao, n.d.](https://clothing.taobao.com/topic/fuzhuangpinpai_568/654e2d77461b3ef7f3a649dc76d6e076.html))" in markdown
 
 
 def test_writer_supports_resource_report_type():

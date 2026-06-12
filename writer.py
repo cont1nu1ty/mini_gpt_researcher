@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 
-from citation_manager import format_references
+from citation_manager import build_citation_labels, citation_label_for, format_references
 from config import Settings
 from llm_client import LLMClient
 from prompts import (
@@ -83,6 +84,7 @@ class Writer:
             markdown = self._template_report(query, sub_questions, normalized)
 
         markdown = self._ensure_required_sections(markdown, query, sub_questions, normalized)
+        markdown = self._normalize_inline_citations(markdown, normalized)
         return self._ensure_reference_section(markdown, normalized)
 
     def save(self, markdown: str) -> str:
@@ -287,11 +289,15 @@ class Writer:
 
     def _build_model_context(self, summaries: list[dict]) -> str:
         lines = []
+        citation_labels = build_citation_labels(summaries)
         for index, item in enumerate(self._compact_summaries_for_model(summaries), start=1):
+            citation_label = citation_label_for(item, citation_labels)
+            url = item.get("url", "")
             lines.extend(
                 [
                     f"[{index}] {item.get('title') or 'Untitled'}",
-                    f"URL: {item.get('url', '')}",
+                    f"URL: {url}",
+                    f"正文短引用: ([{citation_label}]({url}))",
                     f"检索 query: {item.get('query', '')}",
                     f"证据来源类型: {item.get('content_source', 'unknown')}",
                     f"评估标签: {item.get('evaluation_label', 'unknown')}",
@@ -309,7 +315,7 @@ class Writer:
         prompt_kwargs = {
             "query": query,
             "sub_questions": json.dumps(sub_questions, ensure_ascii=False, indent=2),
-            "summaries": json.dumps(summaries, ensure_ascii=False, indent=2),
+            "summaries": summaries if isinstance(summaries, str) else json.dumps(summaries, ensure_ascii=False, indent=2),
             "report_format": self.report_format,
             "total_words": self.total_words,
         }
@@ -360,6 +366,38 @@ class Writer:
             if marker in markdown:
                 return marker
         return self._reference_marker()
+
+    def _normalize_inline_citations(self, markdown: str, summaries: list[dict]) -> str:
+        labels = build_citation_labels(summaries)
+        marker = self._find_reference_marker(markdown)
+        if marker in markdown:
+            body, references = markdown.split(marker, 1)
+            suffix = f"{marker}{references}"
+        else:
+            body, suffix = markdown, ""
+        for url, label in labels.items():
+            if not url:
+                continue
+            escaped_url = re.escape(url)
+            body = re.sub(
+                rf"\[([^\]\n]+)\]\({escaped_url}\)",
+                lambda match: self._shorten_link_text(match, label, url),
+                body,
+            )
+        return f"{body}{suffix}"
+
+    def _shorten_link_text(self, match: re.Match, label: str, url: str) -> str:
+        text = match.group(1).strip()
+        if text == label:
+            return match.group(0)
+        if text.startswith("http://") or text.startswith("https://") or len(text) > 14:
+            return f"[{label}]({url})"
+        if re.search(r"[\u4e00-\u9fff]", text) and len(text) >= 6:
+            return f"[{label}]({url})"
+        generic_texts = {"来源", "网页", "资料", "参考", "链接", "source"}
+        if text.lower() in generic_texts:
+            return f"[{label}]({url})"
+        return match.group(0)
 
     def _resource_template_report(self, query: str, sub_questions: list[str], summaries: list[dict]) -> str:
         normalized = [self._normalize_summary(item) for item in summaries]
