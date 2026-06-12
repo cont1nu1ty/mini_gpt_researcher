@@ -188,20 +188,6 @@ python main.py
 outputs/report.md
 ```
 
-## 项目裁剪说明
-
-为了适合作业展示，本项目刻意不实现：
-
-- 前端页面
-- FastAPI 后端服务
-- MCP 服务
-- 复杂多智能体框架
-- Docker 部署
-- PDF / Word 导出
-- 数据库
-- 登录系统
-- 复杂评估系统
-
 ## 测试与评估
 
 离线单元测试：
@@ -215,13 +201,3 @@ python -m pytest
 ```bash
 python evals/scripts/run_offline_eval.py
 ```
-
-该评估不调用 LLM，也不联网，只检查报告结构、局限性声明和引用格式等基础质量。
-
-## 后续可扩展方向
-
-- 增加 Tavily、Bing、Serper 等可替换搜索器。
-- 增加 robots.txt 检查、缓存和更细粒度网页正文抽取。
-- 支持多轮研究和中间结果保存。
-- 支持按领域定制 Prompt。
-- 增加人工标注评测集和引用准确性评估。
