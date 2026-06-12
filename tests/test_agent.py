@@ -53,3 +53,27 @@ def test_agent_ensures_original_query_is_part_of_formal_search_queries():
         "北京夏季男性短袖购买，材质工艺挑选",
     ]
     assert queries[-1].mode == "broad"
+
+
+def test_agent_debug_prints_structured_data(capsys):
+    agent = object.__new__(ResearchAgent)
+    agent.debug = True
+
+    agent._debug(
+        "搜索结果",
+        [
+            SearchResult(
+                title="北京夏季男士短袖面料",
+                url="https://example.com/shirt",
+                snippet="北京夏季适合选择透气棉、速干和凉感面料。",
+                query="北京夏季男士短袖面料",
+                raw_content="完整正文" * 300,
+            )
+        ],
+    )
+
+    captured = capsys.readouterr()
+
+    assert "[DEBUG] 搜索结果" in captured.out
+    assert '"title": "北京夏季男士短袖面料"' in captured.out
+    assert "内容已截断" in captured.out

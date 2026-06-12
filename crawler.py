@@ -8,14 +8,21 @@ from utils import clean_text, truncate_text
 class Crawler:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self.last_crawl_records: list[dict] = []
         self.headers = {
             "User-Agent": "mini-gpt-researcher/0.1 (+https://example.local; educational demo)"
         }
 
     def crawl_many(self, results: list[SearchResult]) -> list[dict]:
+        self.last_crawl_records = []
         pages: list[dict] = []
-        for result in results[: self.settings.max_web_pages]:
+        for index, result in enumerate(results):
+            if index >= self.settings.max_web_pages:
+                self.last_crawl_records.append(self._crawl_record(result, "skipped_max_web_pages"))
+                continue
             page = self.crawl(result)
+            status = "success" if page["content"] else "failed_or_empty"
+            self.last_crawl_records.append(self._crawl_record(result, status, page))
             if page["content"]:
                 pages.append(page)
         return pages
@@ -80,4 +87,19 @@ class Crawler:
             "provider": result.provider,
             "mode": result.mode,
             "purpose": result.purpose,
+        }
+
+    def _crawl_record(self, result: SearchResult, status: str, page: dict | None = None) -> dict:
+        return {
+            "status": status,
+            "title": result.title,
+            "url": result.url,
+            "query": result.query,
+            "provider": result.provider,
+            "mode": result.mode,
+            "purpose": result.purpose,
+            "snippet_length": len(result.snippet),
+            "raw_content_length": len(result.raw_content),
+            "content_length": len((page or {}).get("content", "")),
+            "content_source": (page or {}).get("content_source", ""),
         }

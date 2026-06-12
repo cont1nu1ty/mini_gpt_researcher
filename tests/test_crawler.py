@@ -21,3 +21,31 @@ def test_crawler_uses_retriever_raw_content_without_http():
     assert page["content_source"] == "retriever_raw_content"
     assert "完整正文" in page["content"]
     assert page["provider"] == "tavily"
+
+
+def test_crawler_records_skipped_results_due_to_max_web_pages():
+    crawler = Crawler(Settings(zai_api_key="test", max_web_pages=1))
+    results = [
+        SearchResult(
+            title="已抓取来源",
+            url="https://example.com/raw",
+            snippet="摘要",
+            query="测试问题",
+            provider="tavily",
+            raw_content="这是检索器直接返回的完整正文，包含可用于报告的具体信息。" * 10,
+        ),
+        SearchResult(
+            title="被上限跳过来源",
+            url="https://example.com/skipped",
+            snippet="摘要",
+            query="测试问题",
+            provider="ddgs",
+        ),
+    ]
+
+    pages = crawler.crawl_many(results)
+
+    assert len(pages) == 1
+    assert crawler.last_crawl_records[0]["status"] == "success"
+    assert crawler.last_crawl_records[1]["status"] == "skipped_max_web_pages"
+    assert crawler.last_crawl_records[1]["url"] == "https://example.com/skipped"
